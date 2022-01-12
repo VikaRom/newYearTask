@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <div class="container">
+    <div class="lever lever-0"></div>
+    <div class="lever lever-1"></div>
+    <div class="lever lever-2"></div>
+    <div class="lever lever-3"></div>
+  </div>
+
+  <div class="img-container">
+    <img src="https://wallpapershome.ru/images/wallpapers/grinch-pohititel-rojdestva-3840x2160-grinch-10336.jpg" alt="">
+  </div>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background-color: rgb(25, 80, 110, 1);
+    }
+
+    .img-container img {
+      width: 100%;
+      max-height: 760px;
+    }
+
+    .container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100px;
+    }
+
+    .lever {
+      width: 50px;
+      height: 50px;
+      border-radius: 50px;
+      margin: 0 5px;
+      ;
+      background-color: rgb(255, 55, 55);
+    }
+
+    .active {
+      background-color: rgb(27, 194, 27);
+    }
+  </style>
+  <script>
+    const ws = new WebSocket('ws://vps.yojji.io', 'victoria_romansova');
+    let arr = [5, 5, 5, 5];
+    let temp = 0;
+    ws.onopen = () => {
+      console.log('online');
+    }
+    const toggle = function (lever) {
+      arr[lever] = arr[lever] === 1 ? 0 : 1;
+
+      if (arr[lever]) {
+        document.querySelector(`.lever-${lever}`).className = `lever lever-${lever} active`;
+        return;
+      }
+      document.querySelector(`.lever-${lever}`).className = `lever lever-${lever}`;
+    }
+
+
+    ws.onmessage = function (event) {
+      const data = JSON.parse(event.data)
+
+      if (typeof (data.pulled) === 'number' && arr[data.pulled] !== 5) {
+        toggle(data.pulled);
+      }
+
+      if (arr.includes(5)) {
+        let lever = arr.indexOf(5);
+        if (lever === 0) {
+          lever = 1;
+        }
+        if (data.newState === 'poweredOn') {
+          arr.forEach((_, i) => {
+            toggle(i);
+          });
+        }
+
+        ws.send(JSON.stringify({ action: "check", "lever1": 0, "lever2": lever, stateId: data.stateId }));
+        if (data.same && lever !== 1) {
+          console.log('if', data);
+          arr[lever] = Number(!arr[0]);
+          toggle(lever);
+        } else if (data.same) {
+          arr.splice(0, 2, 0, 0);
+          toggle(0);
+          toggle(1);
+          console.log('else', arr);
+        }
+      }
+      console.log(data);
+      console.log(arr);
+      if (data.token) {
+        const lever = document.querySelectorAll('.lever');
+        lever.forEach(el => el.style.background = 'rgb(27, 194, 27)');
+        ws.close()
+      } else {
+        console.log(arr);
+      }
+
+
+      if (Reflect.has(data, 'pulled') && !arr.includes(5)) {
+        const sum = arr.reduce((a, b) => a + b, 0);
+
+        if ((sum === 0) && temp === 0) {
+          console.log('first');
+          temp = 4;
+          ws.send(JSON.stringify({ action: "powerOff", stateId: data.stateId }));
+        }
+        if ((sum === 4) && temp === 4) {
+          console.log('second');
+          console.log(temp);
+          console.log(sum);
+          temp = 0;
+          ws.send(JSON.stringify({ action: "powerOff", stateId: data.stateId }));
+        }
+      }
+    }
+  </script>
+</body>
+
+</html>
